@@ -1,6 +1,6 @@
 import pygame
-# import math
 from enum import Enum
+# import math
 
 
 class State(Enum):
@@ -11,29 +11,37 @@ class State(Enum):
     DOWN_SLOW = 4
 
 
-pygame.init()
+class Direction(Enum):
+    UP = 1
+    DOWN = 2
+
+
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
-GRAY = (120, 120, 120)
+GRAY = (180, 180, 180)
+WIDTH, HEIGHT = 800, 800
 
-WIDTH, HEIGHT = 562, 800
+pygame.init()
 win = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Elevator System Sim")
-BG_IMG = pygame.transform.scale(pygame.image.load("apartment-building.jpg"), (WIDTH, HEIGHT))
-BUTTON_FONT = pygame.font.SysFont('Consolas', 10)
+pygame.display.set_caption("Multiple Elevator System Sim")
+SIGN_FONT = pygame.font.SysFont('comicsansms', 30)
+# BUTTON_FONT = pygame.font.SysFont('Consolas', 10)
 FPS = 20
 
-NUM_FLOORS = 5  # 0 + number of floors
-FLOOR_0 = 612
-PX_FLOORS_DIF = 100
-BUTTON_FLOORS_POS = 323
-BUTTON_PANEL_X = 70
-BUTTON_CTRL_X = 70
+NUM_FLOORS = 5  # 0 + number of floors above ground
+NUM_ELEVATORS = 2
+FLOOR0_Y = HEIGHT - 50
+FLOORS_DIFF_Y = 100
+ELEVATORS_DIFF_X = 200
 
+# BUTTON_FLOORS_POS = 323
+# BUTTON_PANEL_X = 70
+# BUTTON_CTRL_X = 70
 
+'''
 class Button:
     button_w = 20
     button_h = 20
@@ -66,32 +74,104 @@ class Button:
         else:
             self.color = self.ogcol
             return False
+'''
+
+
+class Building:
+
+    def __init__(self):
+        self.x = 50
+        self.height = FLOORS_DIFF_Y * NUM_FLOORS
+        self.y = FLOOR0_Y - self.height
+        self.width = ELEVATORS_DIFF_X * (NUM_ELEVATORS + 1)
+
+        self.floors_y = []
+        for floor in range(NUM_FLOORS):
+            self.floors_y.append(self.y + self.height - floor * FLOORS_DIFF_Y)
+
+        self.elevators = []
+        for elevator in range(NUM_ELEVATORS):
+            self.elevators.append(Elevator(elevator, self.x + (elevator + 1) * ELEVATORS_DIFF_X, 2, self.floors_y))
+
+    def update(self):
+        for elevator in self.elevators:
+            elevator.update_movement()
+
+    def draw(self):
+        pygame.draw.rect(win, GRAY, (self.x, self.y, self.width, self.height))
+
+        for floor in range(NUM_FLOORS):
+            pygame.draw.line(win, BLACK, (self.x, self.floors_y[floor]),
+                             (self.x + self.width, self.floors_y[floor]), 2)
+            floor_sign = SIGN_FONT.render(f"Floor {str(floor)}", 1, BLACK)
+            win.blit(floor_sign, (self.x + 5, self.floors_y[floor] - FLOORS_DIFF_Y * 4 // 5))
+
+        for elevator in range(NUM_ELEVATORS):
+            elevator_x = self.x + (elevator + 1) * ELEVATORS_DIFF_X
+            pygame.draw.line(win, BLUE, (elevator_x, self.y), (elevator_x, self.floors_y[0]))
+            elevator_sign = SIGN_FONT.render(f"Elevator {str(elevator)}", 1, BLUE)
+            win.blit(elevator_sign, (elevator_x - 55, self.y - 40))
+
+        for elevator in self.elevators:
+            elevator.draw()
+
+
+class Controller:
+    def __init__(self, building):
+        self.building = building
+
+    def request(self, origin: int, dest: int):
+        raise NotImplementedError("request must be implemented in subclass")
+
+    def assign_elevator(self):
+        raise NotImplementedError("assign_elevator must be implemented in subclass")
+
+    def elevator_floor_update(self, elevator_id, floor):
+        raise NotImplementedError("elevator_floor_update must be implemented in subclass")
+
+
+class Testing(Controller):
+    def assign_elevator(self):
+        self.building.elevators[0].goto(4)
+        self.building.elevators[1].goto(1)
+
+    def elevator_floor_update(self):
+        for elevator in self.building.elevators:
+            if elevator.at_floor:
+                pass
+
+    '''
+    '''
 
 
 class Elevator:
-    VEL = 0.05
-    VEL_SLOW = 0.025
-    elev_w = 63
-    elev_h = 65
+    VEL = 5
+    VEL_SLOW = 2
+    ELEVATOR_W = 80
+    ELEVATOR_H = 60
 
-    def __init__(self):
-        self.floor = 0.0
+    def __init__(self, elevator_id, x, floor, floors_y):
+        self.id = elevator_id
+        self.floor = floor
+        self.floors_y = [y - self.ELEVATOR_H for y in floors_y]
+        self.x = x - self.ELEVATOR_W // 2
+        self.y = self.floors_y[self.floor]
+        self.at_floor = True
         self.state = State.IDLE
+        self.direction = Direction.UP
         self.goal = 0
-        self.requests = [False] * NUM_FLOORS
+        # self.requests = [False] * NUM_FLOORS
 
-        self.buttons_panel = []
-        for floor in range(NUM_FLOORS):
-            self.buttons_panel.append(Button(GRAY, BUTTON_PANEL_X, 400 - 30 * floor, str(floor)))
-
+        '''
         self.ctrl_panel = [Button(GRAY, BUTTON_CTRL_X, 140 - 120, 'U'),
                            Button(GRAY, BUTTON_CTRL_X, 140 - 90, 'u'),
                            Button(GRAY, BUTTON_CTRL_X, 140 - 60, '-'),
                            Button(GRAY, BUTTON_CTRL_X, 140 - 30, 'd'),
                            Button(GRAY, BUTTON_CTRL_X, 140, 'D')]
+        '''
 
     def __str__(self):
-        return f"Elevator is at {self.floor} and is in {self.state}"
+        return f"Elevator {self.id} is at {self.floor} and is in {self.state}"
 
     def all_ctrl_gray(self):
         for button in self.ctrl_panel:
@@ -121,33 +201,56 @@ class Elevator:
             self.goal = floor
             if self.goal > self.floor:
                 self.state = State.UP
-                self.all_ctrl_gray()
-                self.ctrl_panel[0].color = RED
+                self.direction = Direction.UP
+                # self.all_ctrl_gray()
+                # self.ctrl_panel[0].color = RED
             elif self.goal < self.floor:
                 self.state = State.DOWN
-                self.all_ctrl_gray()
-                self.ctrl_panel[4].color = RED
+                self.direction = Direction.DOWN
+                # self.all_ctrl_gray()
+                # self.ctrl_panel[4].color = RED
+            else:
+                return -2
             return 0
         else:
             return -1
 
     def update_movement(self):
-        if self.state == State.UP:
-            self.floor += self.VEL
-        elif self.state == State.DOWN:
-            self.floor -= self.VEL
-        elif self.state == State.UP_SLOW:
-            self.floor += self.VEL_SLOW
-        elif self.state == State.DOWN_SLOW:
-            self.floor -= self.VEL_SLOW
+        self.passing_floors()
 
-    def update_controller(self):
-        # slow down near goal floor
         if self.state == State.UP:
-            if self.goal - self.floor <= 1:
-                self.ctrl_panel[0].color = GRAY
-                self.ctrl_panel[1].color = RED
+            self.y -= self.VEL
+        elif self.state == State.DOWN:
+            self.y += self.VEL
+        elif self.state == State.UP_SLOW:
+            self.y -= self.VEL_SLOW
+        elif self.state == State.DOWN_SLOW:
+            self.y += self.VEL_SLOW
+
+    def passing_floors(self):
+
+        # detect floors
+        if self.y in self.floors_y:
+            self.at_floor = True
+            self.floor = self.floors_y.index(self.y)
+        else:
+            self.at_floor = False
+
+        # check when passing floor
+        if self.at_floor:
+            # slow down near goal floor
+            if self.state == State.UP and self.goal - self.floor == 1:
                 self.state = State.UP_SLOW
+            elif self.state == State.DOWN and self.floor - self.goal == 1:
+                self.state = State.DOWN_SLOW
+            # stop at goal
+            elif self.goal == self.floor:
+                self.state = State.IDLE
+
+            # if self.goal - self.floor <= 1:
+                # self.ctrl_panel[0].color = GRAY
+                # self.ctrl_panel[1].color = RED
+        '''        
         elif self.state == State.DOWN:
             if self.floor - self.goal <= 1:
                 self.ctrl_panel[4].color = GRAY
@@ -204,6 +307,7 @@ class Elevator:
                 self.state = State.IDLE
                 self.requests[int(self.floor)] = False
                 self.ctrl_panel[2].color = RED
+        '''
 
     def next_request(self, up_direction):
         # next request UP
@@ -236,23 +340,19 @@ class Elevator:
             button.draw(BLACK)
 
     def draw(self):
-        floor_px = (NUM_FLOORS + 1 - self.floor) * PX_FLOORS_DIF + 35
-        pygame.draw.rect(win, BLACK, (435, floor_px, self.elev_w, self.elev_h))
-        pygame.draw.rect(win, BLUE, (437, floor_px + 2, self.elev_w - 4, self.elev_h - 4))
+        pygame.draw.rect(win, BLUE, (self.x, self.y, self.ELEVATOR_W, self.ELEVATOR_H))
 
-        self.draw_inside_panel()
-        self.draw_control_panel()
+        # self.draw_inside_panel()
+        # self.draw_control_panel()
 
 
 def main():
     clock = pygame.time.Clock()
+    building = Building()
+    controller = Testing(building)
+    controller.assign_elevator()
 
-    elev = Elevator()
-    buttons_floors = []
-    for floor in range(NUM_FLOORS):
-        buttons_floors.append(Button(GRAY, BUTTON_FLOORS_POS, FLOOR_0 - PX_FLOORS_DIF * floor + 20, str(floor)))
-
-    sign = Button(BLACK, BUTTON_FLOORS_POS + 47, FLOOR_0 - 23, '0', GREEN)
+    # sign = Button(BLACK, BUTTON_FLOORS_POS + 47, FLOOR0_Y - 23, '0', GREEN)
 
     time_sec = 0
     running = True
@@ -265,7 +365,7 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-
+        '''
             if event.type == pygame.MOUSEBUTTONDOWN:  # print(pygame.mouse.get_pos())
                 mouse_pos = pygame.mouse.get_pos()
                 for idx, button in enumerate(buttons_floors):
@@ -274,12 +374,17 @@ def main():
                 for idx, button in enumerate(elev.buttons_panel):
                     if button.is_over(mouse_pos):
                         elev.request(idx)
+        '''
+        building.update()
+        controller.elevator_floor_update()
 
-        win.blit(BG_IMG, (0, 0))
-        elev.update_movement()
-        elev.update_controller()
-        elev.draw()
+        win.fill(WHITE)
+        building.draw()
 
+        # elev.update_movement()
+        # elev.update_controller()
+        # elev.draw()
+        '''
         for button in buttons_floors:
             if elev.state == State.IDLE:
                 button.color = GRAY
@@ -288,7 +393,7 @@ def main():
             button.draw(BLACK)
 
         sign.text = str(round(elev.floor))
-        sign.draw(BLACK)
+        sign.draw(BLACK)'''
         pygame.display.flip()
 
     pygame.quit()
