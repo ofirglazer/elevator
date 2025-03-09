@@ -1,5 +1,7 @@
 import pygame
 from enum import Enum
+import numpy as np
+from copy import copy
 # import math
 
 
@@ -16,12 +18,15 @@ class Direction(Enum):
     DOWN = 2
 
 
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-BLUE = (0, 0, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-GRAY = (180, 180, 180)
+class Color(Enum):
+    WHITE = (255, 255, 255)
+    BLACK = (0, 0, 0)
+    BLUE = (0, 0, 255)
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+    GRAY = (180, 180, 180)
+
+
 WIDTH, HEIGHT = 800, 800
 
 pygame.init()
@@ -31,8 +36,8 @@ SIGN_FONT = pygame.font.SysFont('comicsansms', 30)
 # BUTTON_FONT = pygame.font.SysFont('Consolas', 10)
 FPS = 20
 
-NUM_FLOORS = 5  # 0 + number of floors above ground
-NUM_ELEVATORS = 2
+NUM_FLOORS = 8  # 0 + number of floors above ground
+NUM_ELEVATORS = 3
 FLOOR0_Y = HEIGHT - 50
 FLOORS_DIFF_Y = 100
 ELEVATORS_DIFF_X = 200
@@ -98,18 +103,18 @@ class Building:
             elevator.update_movement()
 
     def draw(self):
-        pygame.draw.rect(win, GRAY, (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(win, Color.GRAY, (self.x, self.y, self.width, self.height))
 
         for floor in range(NUM_FLOORS):
-            pygame.draw.line(win, BLACK, (self.x, self.floors_y[floor]),
+            pygame.draw.line(win, Color.BLACK, (self.x, self.floors_y[floor]),
                              (self.x + self.width, self.floors_y[floor]), 2)
-            floor_sign = SIGN_FONT.render(f"Floor {str(floor)}", 1, BLACK)
+            floor_sign = SIGN_FONT.render(f"Floor {str(floor)}", 1, Color.BLACK)
             win.blit(floor_sign, (self.x + 5, self.floors_y[floor] - FLOORS_DIFF_Y * 4 // 5))
 
         for elevator in range(NUM_ELEVATORS):
             elevator_x = self.x + (elevator + 1) * ELEVATORS_DIFF_X
-            pygame.draw.line(win, BLUE, (elevator_x, self.y), (elevator_x, self.floors_y[0]))
-            elevator_sign = SIGN_FONT.render(f"Elevator {str(elevator)}", 1, BLUE)
+            pygame.draw.line(win, Color.BLUE, (elevator_x, self.y), (elevator_x, self.floors_y[0]))
+            elevator_sign = SIGN_FONT.render(f"Elevator {str(elevator)}", 1, Color.BLUE)
             win.blit(elevator_sign, (elevator_x - 55, self.y - 40))
 
         for elevator in self.elevators:
@@ -126,6 +131,9 @@ class Controller:
     def assign_elevator(self):
         raise NotImplementedError("assign_elevator must be implemented in subclass")
 
+    def update(self):
+        raise NotImplementedError("update must be implemented in subclass")
+
     def elevator_floor_update(self, elevator_id, floor):
         raise NotImplementedError("elevator_floor_update must be implemented in subclass")
 
@@ -140,8 +148,52 @@ class Testing(Controller):
             if elevator.at_floor:
                 pass
 
+    def update(self):
+        self.elevator_floor_update()
+
+    def request(self, origin: int, dest: int):
+        print(f"Received request from {origin} to go to {dest}")
+
     '''
     '''
+
+class Riders:
+    def __init__(self):
+        self.riders = []
+        self.time = 0
+        self.next_spawn_time = 0
+
+        seed = 120
+        self.rng = np.random.default_rng()
+        rider_per_hour = 60
+        average_time_between_riders_sec = 3600 / rider_per_hour
+        self.lam = average_time_between_riders_sec
+
+        # 50% from floor 0 and up, the other 50% distributed between all floors
+        self.origin_floor_prob = [0.5] + (NUM_FLOORS - 1) * [0.5 / (NUM_FLOORS - 1)]
+        # if origin NOT 0, probability to select 0 or others ** must zero origin floor when using
+        prob_dest_is_0 = 0.8
+        self.dest_floor_prob = [prob_dest_is_0] + (NUM_FLOORS - 1) * [(1 - prob_dest_is_0) / (NUM_FLOORS - 2)]
+
+    def spawn(self):
+        pass
+        #if self.time >= self.next_spawn_time:
+
+
+    def add_rider(self):
+        origin_floor = self.rng.choice(range(NUM_FLOORS), p=self.origin_floor_prob)
+        if origin_floor == 0:
+            dest_floor = self.rng.choice(range(1, NUM_FLOORS))
+        else:
+            dest_prob = copy(self.dest_floor_prob)
+            dest_prob[origin_floor] = 0
+            dest_floor = self.rng.choice(range(NUM_FLOORS), p=dest_prob)
+        self.riders.append((int(origin_floor), int(dest_floor)))
+        print(self.riders)
+
+    def update(self):
+        self.time += 1
+        self.spawn()
 
 
 class Elevator:
@@ -163,11 +215,11 @@ class Elevator:
         # self.requests = [False] * NUM_FLOORS
 
         '''
-        self.ctrl_panel = [Button(GRAY, BUTTON_CTRL_X, 140 - 120, 'U'),
-                           Button(GRAY, BUTTON_CTRL_X, 140 - 90, 'u'),
-                           Button(GRAY, BUTTON_CTRL_X, 140 - 60, '-'),
-                           Button(GRAY, BUTTON_CTRL_X, 140 - 30, 'd'),
-                           Button(GRAY, BUTTON_CTRL_X, 140, 'D')]
+        self.ctrl_panel = [Button(Color.GRAY, BUTTON_CTRL_X, 140 - 120, 'U'),
+                           Button(Color.GRAY, BUTTON_CTRL_X, 140 - 90, 'u'),
+                           Button(Color.GRAY, BUTTON_CTRL_X, 140 - 60, '-'),
+                           Button(Color.GRAY, BUTTON_CTRL_X, 140 - 30, 'd'),
+                           Button(Color.GRAY, BUTTON_CTRL_X, 140, 'D')]
         '''
 
     def __str__(self):
@@ -175,20 +227,20 @@ class Elevator:
 
     def all_ctrl_gray(self):
         for button in self.ctrl_panel:
-            button.color = GRAY
+            button.color = Color.GRAY
 
     def request(self, requested_floor):
         self.requests[requested_floor] = True
 
         if self.state == State.IDLE and requested_floor != int(self.floor):
             self.goal = requested_floor
-            self.ctrl_panel[2].color = GRAY
+            self.ctrl_panel[2].color = Color.GRAY
             if self.goal > self.floor:
                 self.state = State.UP
-                self.ctrl_panel[0].color = RED
+                self.ctrl_panel[0].color = Color.RED
             elif self.goal < self.floor:
                 self.state = State.DOWN
-                self.ctrl_panel[4].color = RED
+                self.ctrl_panel[4].color = Color.RED
         elif self.state == State.UP:
             if requested_floor > self.floor:
                 self.goal = requested_floor
@@ -203,12 +255,12 @@ class Elevator:
                 self.state = State.UP
                 self.direction = Direction.UP
                 # self.all_ctrl_gray()
-                # self.ctrl_panel[0].color = RED
+                # self.ctrl_panel[0].color = Color.RED
             elif self.goal < self.floor:
                 self.state = State.DOWN
                 self.direction = Direction.DOWN
                 # self.all_ctrl_gray()
-                # self.ctrl_panel[4].color = RED
+                # self.ctrl_panel[4].color = Color.RED
             else:
                 return -2
             return 0
@@ -248,39 +300,39 @@ class Elevator:
                 self.state = State.IDLE
 
             # if self.goal - self.floor <= 1:
-                # self.ctrl_panel[0].color = GRAY
-                # self.ctrl_panel[1].color = RED
+                # self.ctrl_panel[0].color = Color.GRAY
+                # self.ctrl_panel[1].color = Color.RED
         '''        
         elif self.state == State.DOWN:
             if self.floor - self.goal <= 1:
-                self.ctrl_panel[4].color = GRAY
-                self.ctrl_panel[3].color = RED
+                self.ctrl_panel[4].color = Color.GRAY
+                self.ctrl_panel[3].color = Color.RED
                 self.state = State.DOWN_SLOW
         # resume after stop
         elif self.state == State.IDLE:
             if not any(self.requests):
                 # no more requests
                 self.all_ctrl_gray()
-                self.ctrl_panel[2].color = RED
-            elif self.ctrl_panel[1].color == RED:
+                self.ctrl_panel[2].color = Color.RED
+            elif self.ctrl_panel[1].color == Color.RED:
                 # last movement was up
-                self.ctrl_panel[1].color = GRAY
+                self.ctrl_panel[1].color = Color.GRAY
                 next_request = self.next_request(up_direction=True)
                 if next_request is not None:
                     # up requests remain
                     self.goal = next_request
                     self.state = State.UP
-                    self.ctrl_panel[0].color = RED
-                    self.ctrl_panel[2].color = GRAY
+                    self.ctrl_panel[0].color = Color.RED
+                    self.ctrl_panel[2].color = Color.GRAY
                 else:
                     # switching from up to down
                     next_request = self.next_request(up_direction=False)
                     if next_request is not None:
                         self.goal = next_request
                         self.state = State.DOWN
-                        self.ctrl_panel[4].color = RED
-                        self.ctrl_panel[2].color = GRAY
-            elif self.ctrl_panel[3].color == RED:
+                        self.ctrl_panel[4].color = Color.RED
+                        self.ctrl_panel[2].color = Color.GRAY
+            elif self.ctrl_panel[3].color == Color.RED:
                 # last movement was down
                 self.all_ctrl_gray()
                 next_request = self.next_request(up_direction=False)
@@ -288,16 +340,16 @@ class Elevator:
                     # up requests remain
                     self.goal = next_request
                     self.state = State.DOWN
-                    self.ctrl_panel[4].color = RED
-                    self.ctrl_panel[2].color = GRAY
+                    self.ctrl_panel[4].color = Color.RED
+                    self.ctrl_panel[2].color = Color.GRAY
                 else:
                     # switching from down to up
                     next_request = self.next_request(up_direction=True)
                     if next_request is not None:
                         self.goal = next_request
                         self.state = State.UP
-                        self.ctrl_panel[0].color = RED
-                        self.ctrl_panel[2].color = GRAY
+                        self.ctrl_panel[0].color = Color.RED
+                        self.ctrl_panel[2].color = Color.GRAY
 
         # stop at goal floor
         if abs(self.floor % 1) < self.VEL_SLOW:
@@ -306,7 +358,7 @@ class Elevator:
                 # at goal floor
                 self.state = State.IDLE
                 self.requests[int(self.floor)] = False
-                self.ctrl_panel[2].color = RED
+                self.ctrl_panel[2].color = Color.RED
         '''
 
     def next_request(self, up_direction):
@@ -323,24 +375,24 @@ class Elevator:
         return None
 
     def draw_inside_panel(self):
-        pygame.draw.rect(win, BLACK, (BUTTON_PANEL_X - 7, 400 - 127, 34, 152))
-        pygame.draw.rect(win, GRAY, (BUTTON_PANEL_X - 5, 400 - 125, 30, 150))
+        pygame.draw.rect(win, Color.BLACK, (BUTTON_PANEL_X - 7, 400 - 127, 34, 152))
+        pygame.draw.rect(win, Color.GRAY, (BUTTON_PANEL_X - 5, 400 - 125, 30, 150))
         for idx, button in enumerate(self.buttons_panel):
             # if not self.state == State.IDLE and idx == self.goal:
             if self.requests[idx]:
-                button.color = RED
+                button.color = Color.RED
             else:
-                button.color = GRAY
-            button.draw(BLACK)
+                button.color = Color.GRAY
+            button.draw(Color.BLACK)
 
     def draw_control_panel(self):
-        pygame.draw.rect(win, BLACK, (BUTTON_CTRL_X - 7, 140 - 127, 34, 152))
-        pygame.draw.rect(win, GRAY, (BUTTON_CTRL_X - 5, 140 - 125, 30, 150))
+        pygame.draw.rect(win, Color.BLACK, (BUTTON_CTRL_X - 7, 140 - 127, 34, 152))
+        pygame.draw.rect(win, Color.GRAY, (BUTTON_CTRL_X - 5, 140 - 125, 30, 150))
         for button in self.ctrl_panel:
-            button.draw(BLACK)
+            button.draw(Color.BLACK)
 
     def draw(self):
-        pygame.draw.rect(win, BLUE, (self.x, self.y, self.ELEVATOR_W, self.ELEVATOR_H))
+        pygame.draw.rect(win, Color.BLUE, (self.x, self.y, self.ELEVATOR_W, self.ELEVATOR_H))
 
         # self.draw_inside_panel()
         # self.draw_control_panel()
@@ -351,8 +403,10 @@ def main():
     building = Building()
     controller = Testing(building)
     controller.assign_elevator()
+    controller.update()
+    controller.request(0, 4)
 
-    # sign = Button(BLACK, BUTTON_FLOORS_POS + 47, FLOOR0_Y - 23, '0', GREEN)
+    # sign = Button(Color.BLACK, BUTTON_FLOORS_POS + 47, FLOOR0_Y - 23, '0', Color.GREEN)
 
     time_sec = 0
     running = True
@@ -376,9 +430,9 @@ def main():
                         elev.request(idx)
         '''
         building.update()
-        controller.elevator_floor_update()
+        controller.update()
 
-        win.fill(WHITE)
+        win.fill(Color.WHITE)
         building.draw()
 
         # elev.update_movement()
@@ -387,17 +441,20 @@ def main():
         '''
         for button in buttons_floors:
             if elev.state == State.IDLE:
-                button.color = GRAY
+                button.color = Color.GRAY
             else:
-                button.color = RED
-            button.draw(BLACK)
+                button.color = Color.RED
+            button.draw(Color.BLACK)
 
         sign.text = str(round(elev.floor))
-        sign.draw(BLACK)'''
+        sign.draw(Color.BLACK)'''
         pygame.display.flip()
 
     pygame.quit()
 
 
 if __name__ == "__main__":
-    main()
+    riders = Riders()
+    for _ in range(2):
+        riders.add_rider()
+    #main()
