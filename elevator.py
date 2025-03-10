@@ -51,6 +51,7 @@ NUM_ELEVATORS = 3
 FLOOR0_Y = HEIGHT - 50
 FLOORS_DIFF_Y = 100
 ELEVATORS_DIFF_X = 200
+BUILDING_X0 = 50
 
 # BUTTON_FLOORS_POS = 323
 # BUTTON_PANEL_X = 70
@@ -95,7 +96,7 @@ class Button:
 class Building:
 
     def __init__(self):
-        self.x = 50
+        self.x = BUILDING_X0
         self.height = FLOORS_DIFF_Y * NUM_FLOORS
         self.y = FLOOR0_Y - self.height
         self.width = ELEVATORS_DIFF_X * (NUM_ELEVATORS + 1)
@@ -106,9 +107,9 @@ class Building:
 
         self.elevators = []
         for elevator in range(NUM_ELEVATORS):
-            self.elevators.append(Elevator(elevator, self.x + (elevator + 1) * ELEVATORS_DIFF_X, 2, self.floors_y))
+            self.elevators.append(Elevator(elevator, self.x + (elevator + 1) * ELEVATORS_DIFF_X, 0, self.floors_y))
 
-        self.controller = Testing(self.elevators)
+        self.controller = Fifo(self.elevators)
         head_queue_x = self.x + ELEVATORS_DIFF_X - Elevator.ELEVATOR_W // 2
         self.riders = Riders(self.controller, self.floors_y, head_queue_x)
 
@@ -128,7 +129,7 @@ class Building:
             floor_sign = SIGN_FONT.render(f"Floor {str(floor)}", 1, Color.BLACK.value)
             win.blit(floor_sign, (self.x + 5, self.floors_y[floor] - FLOORS_DIFF_Y * 5 // 6))
 
-            queue_sign = QUEUE_FONT.render(f"{len(self.riders.queues[floor])} in queue", 1 ,Color.BLACK.value)
+            queue_sign = QUEUE_FONT.render(f"{len(self.riders.queues[floor])} in queue", 1, Color.BLACK.value)
             win.blit(queue_sign, (self.x + 5, self.floors_y[floor] - 50))
 
         for elevator in range(NUM_ELEVATORS):
@@ -140,14 +141,17 @@ class Building:
         for elevator in self.elevators:
             elevator.draw()
 
-        self.riders.draw()
+        self.riders.draw([elevator.y for elevator in self.elevators])
+
 
 class Controller:
 
     def __init__(self, elevators):
         self.elevators = elevators
+        self.requests = []
+        self.doors_open = [None] * NUM_ELEVATORS
 
-    def request(self, origin: int, dest: int):
+    def request(self, dest: int):
         raise NotImplementedError("request must be implemented in subclass")
 
     def assign_elevator(self):
@@ -155,6 +159,13 @@ class Controller:
 
     def update(self):
         raise NotImplementedError("update must be implemented in subclass")
+
+    def open_doors(self):
+        for idx, elevator in enumerate(self.elevators):
+            if elevator.state == State.IDLE:
+                self.doors_open[idx] = elevator.floor
+            else:
+                self.doors_open[idx] = None
 
     def elevator_floor_update(self):
         raise NotImplementedError("elevator_floor_update must be implemented in subclass")
@@ -165,24 +176,79 @@ class Testing(Controller):
         self.elevators[0].goto(4)
         self.elevators[1].goto(1)
 
-    def elevator_floor_update(self):
-        for elevator in self.elevators:
-            if elevator.at_floor:
-                pass
-
     def update(self):
         self.elevator_floor_update()
 
     def request(self, origin: int, dest: int):
         print(f"Received request from {origin} to go to {dest}")
 
+    def elevator_floor_update(self):
+        pass
+
     '''
     '''
+
+
+class Fifo(Controller):
+    def assign_elevator(self):
+        pass
+
+    def update(self):
+        self.open_doors()
+        if self.requests:
+            self.process_request()
+
+    def elevator_floor_update(self):
+        pass
+
+    def request(self, dest: int):
+        print(f"Received request to {dest}")
+        self.requests.append(dest)
+
+    def process_request(self):
+        request = self.requests.pop(0)
+        fulfilled = False
+        # look for idle elevator in the destination floor
+        for elevator in self.elevators:
+            if elevator.state == State.IDLE and elevator.floor == request:
+                fulfilled = True
+                break
+
+        # if no idle elevator is in origin floor, assign any idle elevator to go to the origin floor
+        if fulfilled == False:
+            for elevator in self.elevators:
+                if elevator.state == State.IDLE:
+                    fulfilled = True
+                    elevator.goto(request)
+                    break
+
+        # if not served, return the request
+        if fulfilled == False:
+            self.requests.insert(0, request)
+
+        '''
+        if self.state == State.IDLE and requested_floor != int(self.floor):
+            self.goal = requested_floor
+            self.ctrl_panel[2].color = Color.GRAY
+            if self.goal > self.floor:
+                self.state = State.UP
+                self.ctrl_panel[0].color = Color.RED
+            elif self.goal < self.floor:
+                self.state = State.DOWN
+                self.ctrl_panel[4].color = Color.RED
+        elif self.state == State.UP:
+            if requested_floor > self.floor:
+                self.goal = requested_floor
+        elif self.state == State.DOWN:
+            if requested_floor < self.floor:
+                self.goal = requested_floor
+        '''
 
 
 class Rider:
     rider_size = 20
-    def __init__(self, rng, spawn_time):
+
+    def __init__(self, rng, spawn_time, controller):
         # rng is random generator
 
         # 50% from floor 0 and up, the other 50% distributed between all floors
@@ -201,17 +267,25 @@ class Rider:
         self.origin = int(origin_floor)
         self.dest = int(dest_floor)
         self.spawn_time = spawn_time
+        self.controller = controller
 
         colors = list(Color)
         colors.remove(Color.GRAY)
         colors.remove(Color.BLUE)
         self.color = rng.choice(colors)
+        self.call_elevator()
 
     def draw(self, x, y):
         pygame.draw.circle(win, self.color.value, (x, y), self.rider_size // 2)
 
+    def call_elevator(self):
+        self.controller.request(self.origin)
+
+    def enter(self, elevator):
+        print(f"Entering elevator {elevator}")
+
     def __str__(self):
-        return f"Rider from floor {self.origin} to {self.dest}, spawned at {self.spawn_time} with color {self.color.name}"
+        return f"Rider from floor {self.origin} to {self.dest}, spawned at {self.spawn_time}  color {self.color.name}"
 
 
 class Riders:
@@ -221,6 +295,7 @@ class Riders:
         self.head_queue_x = head_queue_x - Rider.rider_size // 2
         self.riders = []
         self.queues = [[] for _ in range(NUM_FLOORS)]
+        self.riding = [[] for _ in range(NUM_ELEVATORS)]
         self.time = 0
         self.next_spawn_time = 0
 
@@ -237,18 +312,36 @@ class Riders:
             self.next_spawn_time = self.time + delta_time
 
     def add_rider(self):
-        new_rider = Rider(self.rng, self.time)
+        new_rider = Rider(self.rng, self.time, self.controller)
         self.riders.append(new_rider)
         self.queues[new_rider.origin].append(new_rider)
 
     def update(self):
         self.time += 1
         self.spawn()
+        self.enter_elevators()
 
-    def draw(self):
+    def enter_elevators(self):
+        for elevator, floor in enumerate(self.controller.doors_open):
+            if floor is not None:
+                for rider in self.queues[floor].copy():
+                    rider.enter(elevator)
+                    self.queues[floor].remove(rider)
+                    self.riding[elevator].append(rider)
+
+
+    def draw(self, elevators_y):
         for queue in self.queues:
             for idx, rider in enumerate(queue):
-                rider.draw(self.head_queue_x - int((idx + 0.5) * rider.rider_size), self.floors_y[rider.origin] - rider.rider_size // 2)
+                rider.draw(self.head_queue_x - int((idx + 0.5) * rider.rider_size),
+                           self.floors_y[rider.origin] - rider.rider_size // 2)
+
+        for elevator_idx, riders in enumerate(self.riding):
+            for rider_idx, rider in enumerate(riders):
+                rider.draw(50 + ELEVATORS_DIFF_X * (elevator_idx + 1) + rider_idx * rider.rider_size,
+                           elevators_y[elevator_idx] + rider.rider_size)
+
+
 
 class Elevator:
     VEL = 5
@@ -266,7 +359,6 @@ class Elevator:
         self.state = State.IDLE
         self.direction = Direction.UP
         self.goal = 0
-        # self.requests = [False] * NUM_FLOORS
 
         '''
         self.ctrl_panel = [Button(Color.GRAY, BUTTON_CTRL_X, 140 - 120, 'U'),
@@ -279,28 +371,11 @@ class Elevator:
     def __str__(self):
         return f"Elevator {self.id} is at {self.floor} and is in {self.state}"
 
+    '''
     def all_ctrl_gray(self):
         for button in self.ctrl_panel:
-            button.color = Color.GRAY
-
-    def request(self, requested_floor):
-        self.requests[requested_floor] = True
-
-        if self.state == State.IDLE and requested_floor != int(self.floor):
-            self.goal = requested_floor
-            self.ctrl_panel[2].color = Color.GRAY
-            if self.goal > self.floor:
-                self.state = State.UP
-                self.ctrl_panel[0].color = Color.RED
-            elif self.goal < self.floor:
-                self.state = State.DOWN
-                self.ctrl_panel[4].color = Color.RED
-        elif self.state == State.UP:
-            if requested_floor > self.floor:
-                self.goal = requested_floor
-        elif self.state == State.DOWN:
-            if requested_floor < self.floor:
-                self.goal = requested_floor
+            button.color = Color.GRAY 
+    '''
 
     def goto(self, floor):
         if self.state == State.IDLE:
@@ -415,6 +490,7 @@ class Elevator:
                 self.ctrl_panel[2].color = Color.RED
         '''
 
+    '''
     def next_request(self, up_direction):
         # next request UP
         if up_direction:
@@ -427,7 +503,9 @@ class Elevator:
                 if self.requests[floor]:
                     return floor
         return None
+    '''
 
+    '''
     def draw_inside_panel(self):
         pygame.draw.rect(win, Color.BLACK, (BUTTON_PANEL_X - 7, 400 - 127, 34, 152))
         pygame.draw.rect(win, Color.GRAY, (BUTTON_PANEL_X - 5, 400 - 125, 30, 150))
@@ -444,6 +522,7 @@ class Elevator:
         pygame.draw.rect(win, Color.GRAY, (BUTTON_CTRL_X - 5, 140 - 125, 30, 150))
         for button in self.ctrl_panel:
             button.draw(Color.BLACK)
+    '''
 
     def draw(self):
         pygame.draw.rect(win, Color.BLUE.value, (self.x, self.y, self.ELEVATOR_W, self.ELEVATOR_H))
@@ -455,7 +534,6 @@ class Elevator:
 def main():
     clock = pygame.time.Clock()
     building = Building()
-
 
     # test code to generate some movement
     building.controller.assign_elevator()
