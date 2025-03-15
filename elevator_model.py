@@ -1,7 +1,6 @@
 from enum import Enum
 import numpy
 
-
 class State(Enum):
     IDLE = 0
     UP = 1
@@ -43,8 +42,6 @@ class ElevatorModel:
 
     def spawn_rider(self):
         if self.time >= self.next_rider_spawn_time:
-            print("should stop here")
-
             # spawn a new rider
             new_rider = Rider(self.num_floors, self.rng, self.time, self.controller)
             self.queues[new_rider.origin].append(new_rider)
@@ -63,9 +60,9 @@ class ElevatorModel:
 
     def update(self, delta_time):
         self.time += delta_time
+        self.controller.update()
         for elevator in self.elevators:
             elevator.update(delta_time)
-        self.controller.update()
         self.spawn_rider()
         self.enter_exit_elevator()
 
@@ -148,9 +145,10 @@ class Fifo(Controller):
         if self.requests:
             self.process_next_request()
 
-    def request(self, origin: int, dest: int):
-        print(f"Received request from {origin} to {dest}")
-        pass #self.requests.append(dest)
+    def request(self, elevator: int, dest: int):
+        print(f"Received request to {dest} in elevator {elevator}")
+        # self.requests.append(dest)
+        self.elevators[elevator].goto(dest)
 
     def call_elevator(self, floor):
         print(f"Received request to {floor}")
@@ -224,7 +222,7 @@ class Rider:
 
     def enter(self, elevator):
         print(f"Entering elevator {elevator}")
-        self.controller.request(self.origin, self.dest)
+        self.controller.request(elevator, self.dest)
 
     def __str__(self):
         return f"Rider from floor {self.origin} to {self.dest}, spawned at {self.spawn_time}"
@@ -273,12 +271,12 @@ class Elevator:
         elif self.state == State.DOWN_SLOW:
             self.floor -= delta_time / self.time_to_floor_slow
         self.floor = round(self.floor, 2)  # make sure the float sums up well
-        # print(f"Elevator {self.id} is at floor {self.floor}")
+        print(f"Elevator {self.id} is at floor {self.floor}")
 
     def process_passing_floors(self):
 
         # detect if at floor
-        if (self.floor).is_integer() and self.goal:  # if at a floor and not just waiting for directions
+        if (self.floor).is_integer() and self.goal is not None:  # if at a floor and not just waiting for directions
             self.at_floor = True
         else:
             self.at_floor = False
@@ -300,5 +298,5 @@ class Elevator:
 if __name__ == "__main__":
     model = ElevatorModel(5, 2)
     print(model.get_state())
-    for _ in range(2000):
+    for _ in range(200):
         model.update(1)
