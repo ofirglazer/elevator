@@ -15,9 +15,9 @@ class Direction(Enum):
 
 
 class ElevatorModel:
-    def __init__(self, num_floors, num_elevator):
+    def __init__(self, num_floors, num_elevators):
         self.num_floors = num_floors  # 0 + number of floors above ground
-        self.num_elevators = num_elevator
+        self.num_elevators = num_elevators
         self.time = 0
 
         self.elevators = []
@@ -59,6 +59,7 @@ class ElevatorModel:
         }
 
     def update(self, delta_time):
+        # TODO controller should only set goal to elevator, elevator start to move later by its own decision
         self.time += delta_time
         self.controller.update()
         for elevator in self.elevators:
@@ -271,10 +272,10 @@ class Elevator:
         elif self.state == State.DOWN_SLOW:
             self.floor -= delta_time / self.time_to_floor_slow
         self.floor = round(self.floor, 2)  # make sure the float sums up well
-        print(f"Elevator {self.id} is at floor {self.floor}")
+        # print(f"Elevator {self.id} is at floor {self.floor}")
 
     def process_passing_floors(self):
-
+        # TODO modify detection logic for passing teh floor in float number
         # detect if at floor
         if (self.floor).is_integer() and self.goal is not None:  # if at a floor and not just waiting for directions
             self.at_floor = True
