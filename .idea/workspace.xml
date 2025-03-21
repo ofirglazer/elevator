@@ -4,11 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5fa02e35-fa44-4912-ad57-925dc0aa1daa" name="Changes" comment="TODO when entering an elevator already waiting, also calling but the elevator starts moving upon entry">
-      <change afterPath="$PROJECT_DIR$/controller.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/visualizer.py" afterDir="false" />
+    <list default="true" id="5fa02e35-fa44-4912-ad57-925dc0aa1daa" name="Changes" comment="mvc WIP, visualizer riders.TODO when entering an elevator already waiting, also calling but the elevator starts moving upon entry">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/elevator_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/elevator_model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/visualizer.py" beforeDir="false" afterPath="$PROJECT_DIR$/visualizer.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -123,7 +122,15 @@
       <option name="project" value="LOCAL" />
       <updated>1742078295267</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="mvc WIP, visualizer riders.TODO when entering an elevator already waiting, also calling but the elevator starts moving upon entry">
+      <option name="closed" value="true" />
+      <created>1742278044011</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1742278044011</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -140,7 +147,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="fixed pycharm env" />
     <MESSAGE value="TODO when entering an elevator already waiting, also calling but the elevator starts moving upon entry" />
-    <option name="LAST_COMMIT_MESSAGE" value="TODO when entering an elevator already waiting, also calling but the elevator starts moving upon entry" />
+    <MESSAGE value="mvc WIP, visualizer riders.TODO when entering an elevator already waiting, also calling but the elevator starts moving upon entry" />
+    <option name="LAST_COMMIT_MESSAGE" value="mvc WIP, visualizer riders.TODO when entering an elevator already waiting, also calling but the elevator starts moving upon entry" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -151,19 +159,10 @@
           <option name="timeStamp" value="7" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/elevator_model.py</url>
-          <line>221</line>
-          <option name="timeStamp" value="21" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/elevator_model.py</url>
-          <line>158</line>
-          <option name="timeStamp" value="22" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <condition expression="any(model_state[&quot;riders_in_elevator&quot;])" language="Python" />
           <url>file://$PROJECT_DIR$/visualizer.py</url>
-          <line>92</line>
-          <option name="timeStamp" value="42" />
+          <line>91</line>
+          <option name="timeStamp" value="46" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

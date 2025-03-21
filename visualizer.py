@@ -8,7 +8,6 @@ class Color(Enum):
     BLUE = (0, 0, 255)
     RED = (255, 0, 0)
     LIME = (0, 255, 0)
-    GRAY = (180, 180, 180)
     YELLOW = (255, 255, 0)
     CYAN = (0, 255, 255)
     MAGENTA = (255, 0, 255)
@@ -19,6 +18,8 @@ class Color(Enum):
     PURPLE = (128, 0, 128)
     TEAL = (0, 128, 128)
     NAVY = (0, 0, 128)
+    GRAY = (180, 180, 180)
+
 
 class ElevatorRenderer:
 
@@ -36,6 +37,7 @@ class ElevatorRenderer:
         self.elevator_spacing = (self.width - 2 * self.margin) // (self.num_elevators + 1)
         self.elevator_width = int(self.elevator_spacing * 0.5)
         self.sign_height_in_floor = 0.75  # of the floor
+        self.rider_radius = 20
 
         self.chute_x = []
         for elevator_id in range(self.num_elevators):
@@ -79,18 +81,32 @@ class ElevatorRenderer:
 
     def draw_elevators(self, model_state):
         for elevator in range(self.num_elevators):
+
+            # draw the elevator
             elevator_y = (self.height - self.margin
                           - self.floor_height * model_state["elevators_position"][elevator] - self.elevator_height)
             pygame.draw.rect(self.window, Color.BLUE.value, (self.chute_x[elevator], elevator_y,
                                                              self.elevator_width, self.elevator_height))
+
+            # draw the riders
+            for idx, rider in enumerate(model_state["riders_in_elevator"][elevator]):
+                rider_x = self.chute_x[0] + (2 * idx + 1) * self.rider_radius
+                rider_y = self.height - self.margin - self.floor_height * model_state["elevators_position"][elevator] - self.rider_radius
+                # color is derived from rider ID
+                rider_color = list(Color)[rider.id % len(Color)].value
+                pygame.draw.circle(self.window, rider_color, (rider_x, rider_y), self.rider_radius)
             #queue_length = len(model_state["riders_in_elevator"][elevator])
             #queue_sign = self.sign_font.render(f"{queue_length} in queue", 1, Color.BLACK.value)
             #self.window.blit(queue_sign, (0, 0))
 
     def draw_queues(self, model_state):
         for floor in range(self.num_floors):
-            for rider in model_state["queues"][floor]:
-                print("rider")
+            for idx, rider in enumerate(model_state["queues"][floor]):
+                rider_x = self.chute_x[0] - (2 * idx + 1) * self.rider_radius
+                rider_y = self.height - self.margin - self.floor_height * floor - self.rider_radius
+                # color is derived from rider ID
+                rider_color = list(Color)[rider.id % len(Color)].value
+                pygame.draw.circle(self.window, rider_color, (rider_x, rider_y), self.rider_radius)
 
     def render(self, model_state):
         self.draw_building(model_state)

@@ -194,11 +194,17 @@ class Fifo(Controller):
 
 class Rider:
 
+    riders_total = 0
+
     def __init__(self, num_floors, rng, spawn_time, controller):
         ''' rng is random generator
         1. randomizing origin floor: 50% from floor 0 and up, the other 50% distributed between all floors
         2. randomizing destination floor: if origin NOT 0, most probable to go to 0
         '''
+
+        # unique ID for each rider
+        self.id = self.riders_total
+        Rider.riders_total += 1
 
         # generating probabilities
         origin_floor_prob = [0.5] + (num_floors - 1) * [0.5 / (num_floors - 1)]
