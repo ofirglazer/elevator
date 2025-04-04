@@ -80,14 +80,17 @@ class ElevatorModel:
                 if floor == rider.dest:
                     self.riders_in_elevator[idx].remove(rider)
                     self.riders_served.append(rider)
-                    print(f"{rider} arrived at destination")
+                    # print(f"{rider} arrived at destination")
 
             # enter if elevator is not full
-            if len(self.riders_in_elevator[idx]) < elevator.capacity:
-                for rider in self.queues[floor].copy():
+            # print(f"before entering: {len(self.riders_in_elevator[idx])} riders in {idx}")
+            # TODO remove prints
+            for rider in self.queues[floor].copy():
+                if len(self.riders_in_elevator[idx]) < elevator.capacity:
                     rider.enter(elevator)
                     self.queues[floor].remove(rider)
                     self.riders_in_elevator[idx].append(rider)
+                    print(f"after entering: {len(self.riders_in_elevator[idx])} riders in {idx}")
 
 class Controller:
 
@@ -141,7 +144,7 @@ class Fifo(Controller):
             self.process_next_request()
 
     def request(self, elevator: int, dest: int):
-        print(f"Received request to {dest} in elevator {elevator}")
+        # print(f"Received request to {dest} in elevator {elevator}")
         # self.requests.append(dest)
         elevator.goto(dest)
 
@@ -222,7 +225,7 @@ class Rider:
         self.controller.call_elevator(self.origin)
 
     def enter(self, elevator):
-        print(f"Entering elevator {elevator}")
+        # print(f"Entering elevator {elevator}")
         self.controller.request(elevator, self.dest)
 
     def __str__(self):
