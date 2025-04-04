@@ -5,7 +5,6 @@ from enum import Enum
 class Color(Enum):
     WHITE = (255, 255, 255)
     BLACK = (0, 0, 0)
-    BLUE = (0, 0, 255)
     RED = (255, 0, 0)
     LIME = (0, 255, 0)
     YELLOW = (255, 255, 0)
@@ -19,6 +18,7 @@ class Color(Enum):
     TEAL = (0, 128, 128)
     NAVY = (0, 0, 128)
     GRAY = (180, 180, 180)
+    BLUE = (0, 0, 255)
 
 
 class ElevatorRenderer:
@@ -90,10 +90,10 @@ class ElevatorRenderer:
 
             # draw the riders
             for idx, rider in enumerate(model_state["riders_in_elevator"][elevator]):
-                rider_x = self.chute_x[0] + (2 * idx + 1) * self.rider_radius
+                rider_x = self.chute_x[elevator] + (2 * idx + 1) * self.rider_radius
                 rider_y = self.height - self.margin - self.floor_height * model_state["elevators_position"][elevator] - self.rider_radius
                 # color is derived from rider ID
-                rider_color = list(Color)[rider.id % len(Color)].value
+                rider_color = list(Color)[rider.id % (len(Color) - 2)].value  # excluding background and elevator color
                 pygame.draw.circle(self.window, rider_color, (rider_x, rider_y), self.rider_radius)
             #queue_length = len(model_state["riders_in_elevator"][elevator])
             #queue_sign = self.sign_font.render(f"{queue_length} in queue", 1, Color.BLACK.value)

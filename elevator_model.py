@@ -69,23 +69,25 @@ class ElevatorModel:
         self.enter_exit_elevators()
 
     def enter_exit_elevators(self):
-        for elevator, floor in enumerate(self.controller.doors_open):
-            # check if at floor
-            if floor is None:
+        for idx, elevator in enumerate(self.elevators):
+            # check if door is open
+            if not elevator.state == State.IDLE_OPEN:
                 continue
+            floor = int(elevator.floor)
+
             # exit if it is your floor
-            for rider in self.riders_in_elevator[elevator].copy():
+            for rider in self.riders_in_elevator[idx].copy():
                 if floor == rider.dest:
-                    self.riders_in_elevator[elevator].remove(rider)
+                    self.riders_in_elevator[idx].remove(rider)
                     self.riders_served.append(rider)
-                    print(f"rider {rider} arrived at destination")
+                    print(f"{rider} arrived at destination")
 
             # enter if elevator is not full
-            if len(self.riders_in_elevator[elevator]) < self.controller.elevators[elevator].capacity:
+            if len(self.riders_in_elevator[idx]) < elevator.capacity:
                 for rider in self.queues[floor].copy():
                     rider.enter(elevator)
                     self.queues[floor].remove(rider)
-                    self.riders_in_elevator[elevator].append(rider)
+                    self.riders_in_elevator[idx].append(rider)
 
 class Controller:
 
@@ -93,7 +95,6 @@ class Controller:
         self.num_elevators = len(elevators)
         self.elevators = elevators
         self.requests = []
-        self.doors_open = [None] * self.num_elevators
 
     def request(self, dest: int):
         raise NotImplementedError("request must be implemented in subclass")
@@ -106,13 +107,6 @@ class Controller:
 
     def call_elevator(self):
         raise NotImplementedError("update must be implemented in subclass")
-
-    def open_doors(self):
-        for idx, elevator in enumerate(self.elevators):
-            if elevator._state == State.IDLE_CLOSED:
-                self.doors_open[idx] = int(elevator.floor)
-            else:
-                self.doors_open[idx] = None
 
 
 class Testing(Controller):
@@ -143,14 +137,13 @@ class Fifo(Controller):
         pass
 
     def update(self):
-        self.open_doors()
         if self.requests:
             self.process_next_request()
 
     def request(self, elevator: int, dest: int):
         print(f"Received request to {dest} in elevator {elevator}")
         # self.requests.append(dest)
-        self.elevators[elevator].goto(dest)
+        elevator.goto(dest)
 
     def call_elevator(self, floor):
         print(f"Received request to {floor}")
@@ -162,14 +155,14 @@ class Fifo(Controller):
 
         # look for idle elevator in the destination floor
         for elevator in self.elevators:
-            if elevator._state == State.IDLE_CLOSED and int(elevator.floor) == request:
+            if elevator.state == State.IDLE_CLOSED and int(elevator.floor) == request:
                 fulfilled = True
                 break
 
         # if no idle elevator is in origin floor, assign any idle elevator to go to the origin floor
         if not fulfilled:
             for elevator in self.elevators:
-                if elevator._state == State.IDLE_CLOSED:
+                if elevator.state == State.IDLE_CLOSED and elevator.goal is None:
                     fulfilled = True
                     elevator.goto(request)
                     break
@@ -226,7 +219,6 @@ class Rider:
         self.dest = int(dest_floor)
         self.spawn_time = spawn_time
         self.controller = controller
-        print(f"time {self.spawn_time}: new rider spawned at {self.origin} to go to {self.dest}")
         self.controller.call_elevator(self.origin)
 
     def enter(self, elevator):
@@ -246,12 +238,12 @@ class Elevator:
         self.floor = initial_floor
         self.capacity = capacity
         self._at_floor = True
-        self._state = State.IDLE_OPEN
+        self.state = State.IDLE_OPEN
         self._direction = Direction.UP
         self.goal = None
 
     def __str__(self):
-        return f"Elevator {self.id} is at {self.floor} and is in {self._state}"
+        return f"Elevator {self.id} is at {self.floor} and is in {self.state}"
 
     def goto(self, floor):
         self.goal = floor
@@ -259,36 +251,38 @@ class Elevator:
     def update(self, delta_time):
         # print(f"elevator {self.id} is in state {self._state.value}")
 
-        if self._state == State.IDLE_OPEN:
-            self._state = State.IDLE_CLOSED  # TODO add timeout
-            return
+        if self.state == State.IDLE_OPEN:
+            if not self.goal is None:
+                self.state = State.IDLE_CLOSED  # TODO add timeout
+                return
 
-        if self._state == State.IDLE_CLOSED:
+        if self.state == State.IDLE_CLOSED:
             if self.goal is None:
                 return
             if int(self.floor) == self.goal:
-                self._state = State.IDLE_OPEN
+                self.state = State.IDLE_OPEN
+                print(f"elevator {self.id} is in state {self.state.value}")
                 self.goal = None
                 print(f"Elevator {self.id} arrived at floor {self.floor}")
             elif self.goal > self.floor:
-                self._state = State.UP
+                self.state = State.UP
                 self._direction = Direction.UP
                 self.slow_if_near()
             elif self.goal < self.floor:
-                self._state = State.DOWN
+                self.state = State.DOWN
                 print(f"elevator {self.id} changed state to down")
                 self._direction = Direction.DOWN
                 self.slow_if_near()
             return  # not check if at floor before elevator moves
 
         # if on the move
-        if self._state == State.UP:
+        if self.state == State.UP:
             self.floor += delta_time / self.time_to_floor
-        elif self._state == State.DOWN:
+        elif self.state == State.DOWN:
             self.floor -= delta_time / self.time_to_floor
-        elif self._state == State.UP_SLOW:
+        elif self.state == State.UP_SLOW:
             self.floor += delta_time / self.time_to_floor_slow
-        elif self._state == State.DOWN_SLOW:
+        elif self.state == State.DOWN_SLOW:
             self.floor -= delta_time / self.time_to_floor_slow
 
         self._at_floor = self._detect_at_floor(delta_time)
@@ -297,30 +291,29 @@ class Elevator:
 
     def action_at_floor(self):
         # just arrived to goal floor
-        if int(self.floor) == self.goal:
-            self._state = State.IDLE_CLOSED
+        if round(self.floor) == self.goal:
+            self.state = State.IDLE_CLOSED
             self.floor = round(self.floor, 0)
             print(f"elevator {self.id} changed state to IDLE_CLOSED at goal floor")
         else:
             self.slow_if_near()
 
     def _detect_at_floor(self, delta_time):
-        if self._state == State.UP_SLOW or self._state == State.DOWN_SLOW:
+        if self.state == State.UP_SLOW or self.state == State.DOWN_SLOW:
             step_size = delta_time / self.time_to_floor_slow
         else:
             step_size = delta_time / self.time_to_floor
 
         if abs(self.floor - round(self.floor)) < step_size:
-            print(f"elevator {self.id} detected at floor {self.floor}")
             return True
         else:
             return False
 
     def slow_if_near(self):  # slow down near goal floor
-        if self._state == State.UP and self.goal - round(self.floor) == 1:
-            self._state = State.UP_SLOW
-        elif self._state == State.DOWN and round(self.floor) - self.goal == 1:
-            self._state = State.DOWN_SLOW
+        if self.state == State.UP and self.goal - round(self.floor) == 1:
+            self.state = State.UP_SLOW
+        elif self.state == State.DOWN and round(self.floor) - self.goal == 1:
+            self.state = State.DOWN_SLOW
 
 
 if __name__ == "__main__":
