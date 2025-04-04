@@ -35,7 +35,7 @@ class ElevatorRenderer:
         self.floor_height = (self.height - 2 * self.margin) // self.num_floors
         self.elevator_height = int(self.floor_height * 0.75)
         self.elevator_spacing = (self.width - 2 * self.margin) // (self.num_elevators + 1)
-        self.elevator_width = int(self.elevator_spacing * 0.5)
+        self.elevator_width = int(self.elevator_spacing * 0.85)
         self.sign_height_in_floor = 0.75  # of the floor
         self.rider_radius = 20
 

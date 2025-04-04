@@ -11,7 +11,7 @@ def main(num_floors, num_elevators):
 
     clock = pygame.time.Clock()
     FPS = 20  # frames per second
-    ACCELERATION_FACTOR = 7
+    ACCELERATION_FACTOR = 40
     running = True
 
     while running:
