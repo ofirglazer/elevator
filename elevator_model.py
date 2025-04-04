@@ -2,11 +2,12 @@ from enum import Enum
 import numpy
 
 class State(Enum):
-    IDLE = 0
-    UP = 1
-    DOWN = 2
-    UP_SLOW = 3
-    DOWN_SLOW = 4
+    IDLE_CLOSED = 0
+    IDLE_OPEN = 1
+    UP = 2
+    DOWN = 3
+    UP_SLOW = 4
+    DOWN_SLOW = 5
 
 
 class Direction(Enum):
@@ -30,8 +31,8 @@ class ElevatorModel:
         self.riders_served = []
 
         # random generator
-        seed = 120
-        rider_per_hour = 60
+        seed = 1
+        rider_per_hour = 600
         average_time_between_riders_sec = 3600 / rider_per_hour
         self.rng = numpy.random.default_rng(seed)
         self.lam = average_time_between_riders_sec
@@ -65,9 +66,9 @@ class ElevatorModel:
         for elevator in self.elevators:
             elevator.update(delta_time)
         self.spawn_rider()
-        self.enter_exit_elevator()
+        self.enter_exit_elevators()
 
-    def enter_exit_elevator(self):
+    def enter_exit_elevators(self):
         for elevator, floor in enumerate(self.controller.doors_open):
             # check if at floor
             if floor is None:
@@ -108,7 +109,7 @@ class Controller:
 
     def open_doors(self):
         for idx, elevator in enumerate(self.elevators):
-            if elevator.state == State.IDLE:
+            if elevator._state == State.IDLE_CLOSED:
                 self.doors_open[idx] = int(elevator.floor)
             else:
                 self.doors_open[idx] = None
@@ -161,14 +162,14 @@ class Fifo(Controller):
 
         # look for idle elevator in the destination floor
         for elevator in self.elevators:
-            if elevator.state == State.IDLE and int(elevator.floor) == request:
+            if elevator._state == State.IDLE_CLOSED and int(elevator.floor) == request:
                 fulfilled = True
                 break
 
         # if no idle elevator is in origin floor, assign any idle elevator to go to the origin floor
         if not fulfilled:
             for elevator in self.elevators:
-                if elevator.state == State.IDLE:
+                if elevator._state == State.IDLE_CLOSED:
                     fulfilled = True
                     elevator.goto(request)
                     break
@@ -191,6 +192,7 @@ class Fifo(Controller):
                     return floor
         return None
     '''
+
 
 class Rider:
 
@@ -237,69 +239,88 @@ class Rider:
 
 class Elevator:
     time_to_floor = 2  # seconds
-    time_to_floor_slow = 4  # seconds
+    time_to_floor_slow = 20  # seconds
 
     def __init__(self, elevator_id, initial_floor=0.0, capacity=4):
         self.id = elevator_id
         self.floor = initial_floor
         self.capacity = capacity
-        self.at_floor = True
-        self.state = State.IDLE
-        self.direction = Direction.UP
+        self._at_floor = True
+        self._state = State.IDLE_OPEN
+        self._direction = Direction.UP
         self.goal = None
 
     def __str__(self):
-        return f"Elevator {self.id} is at {self.floor} and is in {self.state}"
+        return f"Elevator {self.id} is at {self.floor} and is in {self._state}"
 
     def goto(self, floor):
-        if self.state == State.IDLE:
-            self.goal = floor
-            if self.goal > self.floor:
-                self.state = State.UP
-                self.direction = Direction.UP
-            elif self.goal < self.floor:
-                self.state = State.DOWN
-                self.direction = Direction.DOWN
-            else:
-                return -2
-            return 0
-        else:
-            return -1
+        self.goal = floor
 
     def update(self, delta_time):
-        self.process_passing_floors()
+        # print(f"elevator {self.id} is in state {self._state.value}")
 
-        if self.state == State.UP:
-            self.floor += delta_time / self.time_to_floor
-        elif self.state == State.DOWN:
-            self.floor -= delta_time / self.time_to_floor
-        elif self.state == State.UP_SLOW:
-            self.floor += delta_time / self.time_to_floor_slow
-        elif self.state == State.DOWN_SLOW:
-            self.floor -= delta_time / self.time_to_floor_slow
-        self.floor = round(self.floor, 2)  # make sure the float sums up well
-        # print(f"Elevator {self.id} is at floor {self.floor}")
+        if self._state == State.IDLE_OPEN:
+            self._state = State.IDLE_CLOSED  # TODO add timeout
+            return
 
-    def process_passing_floors(self):
-        # TODO modify detection logic for passing teh floor in float number
-        # detect if at floor
-        if (self.floor).is_integer() and self.goal is not None:  # if at a floor and not just waiting for directions
-            self.at_floor = True
-        else:
-            self.at_floor = False
-
-        # check when passing floor
-        if self.at_floor:
-            # slow down near goal floor
-            if self.state == State.UP and self.goal - int(self.floor) == 1:
-                self.state = State.UP_SLOW
-            elif self.state == State.DOWN and int(self.floor) - self.goal == 1:
-                self.state = State.DOWN_SLOW
-            # stop at goal floor
-            elif self.goal == int(self.floor):
-                self.state = State.IDLE
+        if self._state == State.IDLE_CLOSED:
+            if self.goal is None:
+                return
+            if int(self.floor) == self.goal:
+                self._state = State.IDLE_OPEN
                 self.goal = None
                 print(f"Elevator {self.id} arrived at floor {self.floor}")
+            elif self.goal > self.floor:
+                self._state = State.UP
+                self._direction = Direction.UP
+                self.slow_if_near()
+            elif self.goal < self.floor:
+                self._state = State.DOWN
+                print(f"elevator {self.id} changed state to down")
+                self._direction = Direction.DOWN
+                self.slow_if_near()
+            return  # not check if at floor before elevator moves
+
+        # if on the move
+        if self._state == State.UP:
+            self.floor += delta_time / self.time_to_floor
+        elif self._state == State.DOWN:
+            self.floor -= delta_time / self.time_to_floor
+        elif self._state == State.UP_SLOW:
+            self.floor += delta_time / self.time_to_floor_slow
+        elif self._state == State.DOWN_SLOW:
+            self.floor -= delta_time / self.time_to_floor_slow
+
+        self._at_floor = self._detect_at_floor(delta_time)
+        if self._at_floor:
+            self.action_at_floor()
+
+    def action_at_floor(self):
+        # just arrived to goal floor
+        if int(self.floor) == self.goal:
+            self._state = State.IDLE_CLOSED
+            self.floor = round(self.floor, 0)
+            print(f"elevator {self.id} changed state to IDLE_CLOSED at goal floor")
+        else:
+            self.slow_if_near()
+
+    def _detect_at_floor(self, delta_time):
+        if self._state == State.UP_SLOW or self._state == State.DOWN_SLOW:
+            step_size = delta_time / self.time_to_floor_slow
+        else:
+            step_size = delta_time / self.time_to_floor
+
+        if abs(self.floor - round(self.floor)) < step_size:
+            print(f"elevator {self.id} detected at floor {self.floor}")
+            return True
+        else:
+            return False
+
+    def slow_if_near(self):  # slow down near goal floor
+        if self._state == State.UP and self.goal - round(self.floor) == 1:
+            self._state = State.UP_SLOW
+        elif self._state == State.DOWN and round(self.floor) - self.goal == 1:
+            self._state = State.DOWN_SLOW
 
 
 if __name__ == "__main__":

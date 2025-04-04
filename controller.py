@@ -11,6 +11,7 @@ def main(num_floors, num_elevators):
 
     clock = pygame.time.Clock()
     FPS = 20  # frames per second
+    ACCELERATION_FACTOR = 7
     running = True
 
     while running:
@@ -19,7 +20,7 @@ def main(num_floors, num_elevators):
             if event.type == pygame.QUIT:
                 running = False
 
-        model.update(1)
+        model.update(ACCELERATION_FACTOR / FPS)
         model_state = model.get_state()
         renderer.render(model_state)
 
